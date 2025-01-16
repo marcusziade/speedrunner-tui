@@ -21,56 +21,60 @@ import (
 const baseURL = "https://www.speedrun.com/api/v2"
 
 var (
+	// Base app style
 	appStyle = lipgloss.NewStyle().
-			Padding(1, 1)
-
-	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#000000")).
-			Background(lipgloss.Color("#EAB308")).
-			Bold(true).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderLeft(true).
-			BorderLeftForeground(lipgloss.Color("#06B6D4")).
 			Padding(0, 1)
 
+		// Header styles
+	titleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#000000")).
+			Background(lipgloss.Color("#FFD700")). // Bright gold
+			Bold(true).
+			Padding(0, 1)
+
+	unreadCountStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFD700")). // Gold text
+				Background(lipgloss.Color("#1A1B26")).
+				Border(lipgloss.NormalBorder()).
+				BorderForeground(lipgloss.Color("#FFD700")).
+				MarginLeft(1).
+				Padding(0, 1)
+
+		// Notification item styles
 	selectedItemStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("#000000")).
-				BorderStyle(lipgloss.NormalBorder()).
+				Background(lipgloss.Color("#2C2A1C")). // Dark yellow/gold background
+				Border(lipgloss.NormalBorder()).
 				BorderLeft(true).
-				BorderLeftForeground(lipgloss.Color("#06B6D4")).
+				BorderLeftForeground(lipgloss.Color("#FFD700")). // Bright gold accent
 				Padding(0, 1)
 
 	unselectedItemStyle = lipgloss.NewStyle().
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderLeft(true).
-				BorderLeftForeground(lipgloss.Color("#06B6D4")).
-				Padding(0, 1)
-
-	statusBarStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#94A3B8")).
-			Border(lipgloss.NormalBorder()).
-			BorderTop(true).
-			BorderTopForeground(lipgloss.Color("#164E63")).
-			Padding(1, 1)
-
-	unreadCountStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FACC15")).
-				Background(lipgloss.Color("#000000")).
 				Border(lipgloss.NormalBorder()).
-				BorderForeground(lipgloss.Color("#FACC15")).
+				BorderLeft(true).
+				BorderLeftForeground(lipgloss.Color("#404040")).
 				Padding(0, 1)
 
-	urlStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#22D3EE")).
-			Faint(true)
-
+	// Status indicators
 	readDotStyle = lipgloss.NewStyle().
-			SetString("[✓]").
-			Foreground(lipgloss.Color("#22C55E"))
+			SetString("✓").
+			Foreground(lipgloss.Color("#00FF00")) // Green
 
 	unreadDotStyle = lipgloss.NewStyle().
-			SetString("[!]").
-			Foreground(lipgloss.Color("#EAB308"))
+			SetString("!").
+			Foreground(lipgloss.Color("#FFD700")) // Matching gold
+
+	// URL style
+	urlStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#5F89F4")). // Subtle blue
+			Faint(true)
+
+	// Status bar
+	statusBarStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")). // Subtle gray
+			Border(lipgloss.NormalBorder()).
+			BorderTop(true).
+			BorderTopForeground(lipgloss.Color("#333333")).
+			Padding(0, 1)
 )
 
 // API types
@@ -252,20 +256,20 @@ func (m model) renderContent() string {
 func (m model) renderNotification(n Notification) string {
 	var b strings.Builder
 
-	// Status and date
+	// Status and timestamp on one line
 	readStatus := unreadDotStyle.String()
 	if n.Read {
 		readStatus = readDotStyle.String()
 	}
 	date := time.Unix(n.Date, 0).Format("2006-01-02 15:04:05")
-	b.WriteString(fmt.Sprintf("%s %s\n", readStatus, date))
+	b.WriteString(fmt.Sprintf("[%s] %s\n", readStatus, date))
 
-	// Title
+	// Title with proper wrapping
 	b.WriteString(n.Title)
 	b.WriteString("\n")
 
-	// URL
-	b.WriteString(urlStyle.Render("speedrun.com" + n.Path))
+	// URL slightly dimmed
+	b.WriteString(urlStyle.Render(fmt.Sprintf("speedrun.com%s", n.Path)))
 
 	return b.String()
 }
@@ -275,17 +279,16 @@ func (m model) View() string {
 		return fmt.Sprintf("Error: %v", m.err)
 	}
 
-	// Header
+	// Header with unread count
 	header := titleStyle.Render("SPEEDRUN.COM NOTIFICATIONS")
 	unreadCount := unreadCountStyle.Render(fmt.Sprintf("%d unread", m.unreadCount))
 	header = lipgloss.JoinHorizontal(lipgloss.Center, header, unreadCount)
 
-	// Status bar
+	// Status bar with simplified navigation hints
 	statusBar := statusBarStyle.Render(
-		fmt.Sprintf("Page %d/%d • ↑/↓ or j/k to navigate • enter to open • q to quit",
+		fmt.Sprintf("Page %d/%d • j/k or ↑/↓ to navigate • enter open • q quit",
 			m.pagination.Page, m.pagination.Pages))
 
-	// Combine all elements
 	return appStyle.Render(
 		lipgloss.JoinVertical(
 			lipgloss.Left,
