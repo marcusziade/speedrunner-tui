@@ -15,13 +15,32 @@ const (
 	baseURL = "https://www.speedrun.com/api/v2"
 )
 
-// RequestBody represents the POST request body
+type Notification struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Path  string `json:"path"`
+	Read  bool   `json:"read"`
+	Date  int64  `json:"date"` // Unix timestamp
+}
+
+type Pagination struct {
+	Count int `json:"count"`
+	Page  int `json:"page"`
+	Pages int `json:"pages"`
+	Per   int `json:"per"`
+}
+
+type NotificationResponse struct {
+	UnreadCount   int            `json:"unreadCount"`
+	Notifications []Notification `json:"notifications"`
+	Pagination    Pagination     `json:"pagination"`
+}
+
 type RequestBody struct {
 	U int `json:"u"`
 	I int `json:"i"`
 }
 
-// Let's just use map[string]interface{} initially to see the structure
 type Client struct {
 	httpClient *http.Client
 	sessionID  string
@@ -36,7 +55,7 @@ func NewClient(sessionID string) *Client {
 	}
 }
 
-func (c *Client) GetNotifications() (map[string]interface{}, error) {
+func (c *Client) GetNotifications() (*NotificationResponse, error) {
 	body := RequestBody{
 		U: 1,
 		I: 1,
@@ -74,25 +93,25 @@ func (c *Client) GetNotifications() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Read the raw response first
-	rawBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response body: %w", err)
-	}
-
-	// Print raw response for debugging
-	fmt.Printf("Raw response: %s\n", string(rawBody))
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(rawBody, &result); err != nil {
+	var result NotificationResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	return result, nil
+	return &result, nil
+}
+
+func formatDate(timestamp int64) string {
+	t := time.Unix(timestamp, 0)
+	return t.Format("2006-01-02 15:04:05")
 }
 
 func main() {
-	sessionID := flag.String("session", "", "Speedrun.com PHPSESSID cookie value")
+	var (
+		sessionID  = flag.String("session", "", "Speedrun.com PHPSESSID cookie value")
+		jsonOutput = flag.Bool("json", false, "Output in JSON format")
+		showRead   = flag.Bool("all", false, "Show both read and unread notifications")
+	)
 	flag.Parse()
 
 	if *sessionID == "" {
@@ -107,13 +126,40 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Pretty print the result
-	prettyJSON, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		fmt.Printf("Error formatting JSON: %v\n", err)
-		os.Exit(1)
+	if *jsonOutput {
+		// Pretty print JSON output
+		out, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			fmt.Printf("Error formatting JSON: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(string(out))
+		return
 	}
 
-	fmt.Printf("\nParsed JSON response:\n%s\n", string(prettyJSON))
+	// Print summary
+	fmt.Printf("Total notifications: %d (Unread: %d)\n", result.Pagination.Count, result.UnreadCount)
+	if result.Pagination.Pages > 1 {
+		fmt.Printf("Page %d of %d\n", result.Pagination.Page, result.Pagination.Pages)
+	}
+	fmt.Println()
+
+	// Print notifications
+	for _, n := range result.Notifications {
+		if !*showRead && n.Read {
+			continue // Skip read notifications unless -all flag is set
+		}
+
+		readStatus := " "
+		if !n.Read {
+			readStatus = "*"
+		}
+
+		fmt.Printf("[%s] %s\n  %s\n  https://www.speedrun.com%s\n\n",
+			readStatus,
+			formatDate(n.Date),
+			n.Title,
+			n.Path)
+	}
 }
 
