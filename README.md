@@ -10,3 +10,7 @@ or
 
 `go build`
 `./speedrunner -session <cookie>`
+
+## Prereqs
+- Go installed
+- speedrun.com account logged in for cookie retrieval for personal notifications
